@@ -164,6 +164,29 @@ app.use(
 app.use('/uploads', express.static(UPLOADS_DIR));
 app.use(express.static(PUBLIC_DIR));
 
+let initError = null;
+const initPromise = ensureStorage()
+  .then(connectDB)
+  .then(seedDefaultUsers)
+  .catch((err) => {
+    initError = err;
+    throw err;
+  });
+
+app.use(async (_req, _res, next) => {
+  if (initError) {
+    next(initError);
+    return;
+  }
+
+  try {
+    await initPromise;
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 async function ensureStorage() {
   await fs.mkdir(UPLOADS_DIR, { recursive: true });
 }
@@ -713,15 +736,17 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ message: 'Server error.' });
 });
 
-ensureStorage()
-  .then(connectDB)
-  .then(seedDefaultUsers)
-  .then(() => {
-    app.listen(PORT, () => {
-      console.log(`Inventory system running on http://localhost:${PORT}`);
+if (require.main === module) {
+  initPromise
+    .then(() => {
+      app.listen(PORT, () => {
+        console.log(`Inventory system running on http://localhost:${PORT}`);
+      });
+    })
+    .catch((err) => {
+      console.error('Failed to initialize application.', err);
+      process.exit(1);
     });
-  })
-  .catch((err) => {
-    console.error('Failed to initialize application.', err);
-    process.exit(1);
-  });
+}
+
+module.exports = app;
