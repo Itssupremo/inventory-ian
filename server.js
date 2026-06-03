@@ -193,18 +193,32 @@ async function ensureStorage() {
 }
 
 async function connectDB() {
-  if (!MONGO_URI) {
+  let mongoUri = String(MONGO_URI || '').trim();
+
+  if ((mongoUri.startsWith('"') && mongoUri.endsWith('"')) || (mongoUri.startsWith("'") && mongoUri.endsWith("'"))) {
+    mongoUri = mongoUri.slice(1, -1).trim();
+  }
+
+  if (/^MONGO_URI\s*=\s*/i.test(mongoUri)) {
+    mongoUri = mongoUri.replace(/^MONGO_URI\s*=\s*/i, '').trim();
+  }
+
+  if (!mongoUri) {
     throw new Error('MONGO_URI is missing. Add it in your .env file.');
   }
 
-  if (MONGO_URI.includes('<db_password>')) {
+  if (mongoUri.includes('<db_password>')) {
     throw new Error(
       'MONGO_URI still contains <db_password>. Replace it with your actual Atlas DB user password in .env.'
     );
   }
 
+  if (!mongoUri.startsWith('mongodb://') && !mongoUri.startsWith('mongodb+srv://')) {
+    throw new Error('Invalid MONGO_URI format. It must start with "mongodb://" or "mongodb+srv://".');
+  }
+
   try {
-    await mongoose.connect(MONGO_URI, {
+    await mongoose.connect(mongoUri, {
       dbName: 'inventory_system',
       serverSelectionTimeoutMS: 5000,
       maxPoolSize: 5,
