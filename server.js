@@ -170,7 +170,8 @@ const initPromise = ensureStorage()
   .then(seedDefaultUsers)
   .catch((err) => {
     initError = err;
-    throw err;
+    console.error('Initialization error:', err);
+    return null;
   });
 
 app.use(async (_req, _res, next) => {
@@ -729,11 +730,12 @@ app.delete('/api/assets/:internalId', requireRole(['Administrator']), async (req
 });
 
 app.use((err, _req, res, _next) => {
-  if (err instanceof multer.MulterError || err?.message) {
-    res.status(400).json({ message: err.message || 'Request failed.' });
-    return;
+  const isMulter = err instanceof multer.MulterError;
+  const status = isMulter ? 400 : (err?.status || err?.statusCode || 500);
+  if (status >= 500) {
+    console.error('Server error:', err);
   }
-  res.status(500).json({ message: 'Server error.' });
+  res.status(status).json({ message: err?.message || 'Server error.' });
 });
 
 if (require.main === module) {
