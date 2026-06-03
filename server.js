@@ -556,6 +556,40 @@ app.put('/api/users/:id', requireRole(['Administrator']), async (req, res) => {
     const name = normalizeText(req.body.displayName);
     if (name) user.displayName = name;
   }
+  if (req.body.username !== undefined) {
+    const username = normalizeText(req.body.username).toLowerCase();
+    if (!username) {
+      res.status(400).json({ message: 'Username cannot be empty.' });
+      return;
+    }
+    if (username !== user.username) {
+      const exists = await User.findOne({ username, _id: { $ne: user._id } });
+      if (exists) {
+        res.status(409).json({ message: 'Username already exists.' });
+        return;
+      }
+      user.username = username;
+    }
+  }
+  if (req.body.role !== undefined) {
+    const role = normalizeText(req.body.role);
+    const profile = ROLE_PROFILES[role];
+    if (!profile) {
+      res.status(400).json({ message: 'Invalid role.' });
+      return;
+    }
+    user.role = profile.role;
+    user.accessLevel = profile.accessLevel;
+    user.responsibilities = profile.responsibilities;
+    user.guidelines = profile.guidelines;
+    user.canModifyInventory = profile.canModifyInventory;
+  }
+  if (req.body.password !== undefined) {
+    const password = String(req.body.password || '').trim();
+    if (password) {
+      user.passwordHash = await bcrypt.hash(password, 10);
+    }
+  }
   if (req.body.position !== undefined) user.position = normalizeText(req.body.position);
   if (req.body.office   !== undefined) user.office   = normalizeText(req.body.office);
   if (req.body.email    !== undefined) user.email    = (req.body.email || '').trim();
@@ -588,6 +622,10 @@ app.put('/api/auth/profile', requireAuth, async (req, res) => {
   if (req.body.position !== undefined) user.position = normalizeText(req.body.position);
   if (req.body.office   !== undefined) user.office   = normalizeText(req.body.office);
   if (req.body.email    !== undefined) user.email    = (req.body.email || '').trim();
+  if (req.body.password !== undefined) {
+    const password = String(req.body.password || '').trim();
+    if (password) user.passwordHash = await bcrypt.hash(password, 10);
+  }
 
   await user.save();
   res.json({ user: toSafeUser(user) });

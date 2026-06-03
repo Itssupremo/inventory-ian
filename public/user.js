@@ -365,6 +365,7 @@ function renderProfile() {
   val('profilePosition',    user.position);
   val('profileOffice',      user.office);
   val('profileEmail',       user.email);
+  val('profilePassword',    '');
   val('profileUsername',    user.username);
   const roleEl = document.getElementById('profileRole');
   if (roleEl) roleEl.value = user.role + (user.accessLevel ? ' – ' + user.accessLevel : '');
@@ -380,6 +381,7 @@ async function handleProfileSubmit(e) {
   const newPos  = document.getElementById('profilePosition')?.value.trim();
   const newOff  = document.getElementById('profileOffice')?.value.trim();
   const newEmail = document.getElementById('profileEmail')?.value.trim();
+  const newPassword = document.getElementById('profilePassword')?.value || '';
   if (!newName) {
     if (msgEl) { msgEl.textContent = 'Display name cannot be empty.'; msgEl.className = 'message error'; }
     return;
@@ -388,7 +390,7 @@ async function handleProfileSubmit(e) {
     const data = await request('/api/auth/profile', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ displayName: newName, position: newPos, office: newOff, email: newEmail }),
+      body: JSON.stringify({ displayName: newName, position: newPos, office: newOff, email: newEmail, password: newPassword }),
     });
     state.currentUser = data.user;
 

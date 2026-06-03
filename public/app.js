@@ -539,7 +539,7 @@ function renderUserTable() {
       <td id="ueml-${user.internalId}">${escHtml(user.email)}</td>
       <td class="toggle-cell">${toggleHtml}</td>
       <td class="action-cell">
-        <button class="btn btn-small btn-primary user-rename-btn" data-id="${user.internalId}" data-name="${escAttr(user.displayName)}" data-position="${escAttr(user.position)}" data-office="${escAttr(user.office)}" data-email="${escAttr(user.email)}">Edit</button>
+        <button class="btn btn-small btn-primary user-rename-btn" data-id="${user.internalId}" data-username="${escAttr(user.username)}" data-role="${escAttr(user.role)}" data-name="${escAttr(user.displayName)}" data-position="${escAttr(user.position)}" data-office="${escAttr(user.office)}" data-email="${escAttr(user.email)}">Edit</button>
         <button class="btn btn-small btn-danger user-delete-btn" data-id="${user.internalId}" data-name="${escAttr(user.displayName)}">Delete</button>
       </td>`;
     tbody.appendChild(tr);
@@ -576,10 +576,13 @@ function renderUserTable() {
   tbody.querySelectorAll('.user-rename-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.getElementById('editUserId').value       = btn.dataset.id;
+      document.getElementById('editUsername').value     = btn.dataset.username || '';
+      document.getElementById('editRole').value         = btn.dataset.role || 'User';
       document.getElementById('editDisplayName').value  = btn.dataset.name;
       document.getElementById('editPosition').value     = btn.dataset.position;
       document.getElementById('editOffice').value       = btn.dataset.office;
       document.getElementById('editEmail').value        = btn.dataset.email || '';
+      document.getElementById('editPassword').value     = '';
       document.getElementById('editUserMessage').textContent = '';
       document.getElementById('editUserMessage').className  = 'message';
       openModal('editUserModal');
@@ -692,20 +695,45 @@ function attachEvents() {
   document.getElementById('editUserForm')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const id      = document.getElementById('editUserId').value;
+    const newUsername = document.getElementById('editUsername').value.trim();
+    const newRole = document.getElementById('editRole').value;
     const newName  = document.getElementById('editDisplayName').value.trim();
     const newPos   = document.getElementById('editPosition').value.trim();
     const newOff   = document.getElementById('editOffice').value.trim();
     const newEmail = document.getElementById('editEmail').value.trim();
+    const newPassword = document.getElementById('editPassword').value;
     const msgEl   = document.getElementById('editUserMessage');
-    if (!newName) return;
+    if (!newName || !newUsername) return;
+    const payload = {
+      username: newUsername,
+      role: newRole,
+      displayName: newName,
+      position: newPos,
+      office: newOff,
+      email: newEmail,
+    };
+    if (newPassword) payload.password = newPassword;
     try {
       const updated = await request('/api/users/' + id, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ displayName: newName, position: newPos, office: newOff, email: newEmail }),
+        body: JSON.stringify(payload),
       });
       const idx = state.users.findIndex(u => u.internalId === id);
-      if (idx >= 0) Object.assign(state.users[idx], { displayName: updated.displayName, position: updated.position, office: updated.office, email: updated.email });
+      if (idx >= 0) {
+        Object.assign(state.users[idx], {
+          username: updated.username,
+          role: updated.role,
+          displayName: updated.displayName,
+          position: updated.position,
+          office: updated.office,
+          email: updated.email,
+          accessLevel: updated.accessLevel,
+          responsibilities: updated.responsibilities,
+          guidelines: updated.guidelines,
+          canModifyInventory: updated.canModifyInventory,
+        });
+      }
       populateAssignedToSelect(document.getElementById('assignedTo')?.value || '');
       renderUserTable();
       closeModal('editUserModal');

@@ -364,6 +364,17 @@
           <form id="editUserForm">
             <input type="hidden" id="editUserId" />
             <div class="field-group">
+              <label for="editUsername">Username</label>
+              <input id="editUsername" type="text" required autocomplete="off" placeholder="e.g. jdelacruz" />
+            </div>
+            <div class="field-group">
+              <label for="editRole">Role</label>
+              <select id="editRole">
+                <option value="User">User</option>
+                <option value="Administrator">Administrator</option>
+              </select>
+            </div>
+            <div class="field-group">
               <label for="editDisplayName">Display Name</label>
               <input id="editDisplayName" type="text" required placeholder="Display name" />
             </div>
@@ -378,6 +389,10 @@
             <div class="field-group">
               <label for="editEmail">Email</label>
               <input id="editEmail" type="email" placeholder="e.g. juan@example.com" />
+            </div>
+            <div class="field-group">
+              <label for="editPassword">New Password (optional)</label>
+              <input id="editPassword" type="password" autocomplete="new-password" placeholder="Leave blank to keep current password" />
             </div>
             <p id="editUserMessage" class="message"></p>
             <div class="modal-actions">
