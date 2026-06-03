@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs/promises');
 const mongoose = require('mongoose');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 const Asset = require('./models/Asset');
@@ -146,21 +147,67 @@ const upload = multer({
   },
 });
 
+function normalizeMongoUri(rawValue) {
+  let mongoUri = String(rawValue || '').trim();
+
+  if ((mongoUri.startsWith('"') && mongoUri.endsWith('"')) || (mongoUri.startsWith("'") && mongoUri.endsWith("'"))) {
+    mongoUri = mongoUri.slice(1, -1).trim();
+  }
+
+  if (/^MONGO_URI\s*=\s*/i.test(mongoUri)) {
+    mongoUri = mongoUri.replace(/^MONGO_URI\s*=\s*/i, '').trim();
+  }
+
+  return mongoUri;
+}
+
+function validateMongoUri(mongoUri) {
+  if (!mongoUri) {
+    throw new Error('MONGO_URI is missing. Add it in your .env file.');
+  }
+
+  if (mongoUri.includes('<db_password>')) {
+    throw new Error(
+      'MONGO_URI still contains <db_password>. Replace it with your actual Atlas DB user password in .env.'
+    );
+  }
+
+  if (!mongoUri.startsWith('mongodb://') && !mongoUri.startsWith('mongodb+srv://')) {
+    throw new Error('Invalid MONGO_URI format. It must start with "mongodb://" or "mongodb+srv://".');
+  }
+}
+
 app.use(express.json());
-app.use(
-  session({
-    name: 'inventory.sid',
-    secret: SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: false,
-      maxAge: 1000 * 60 * 60 * 8,
-    },
-  })
-);
+const isProduction = process.env.NODE_ENV === 'production';
+const normalizedUriForSession = normalizeMongoUri(MONGO_URI);
+let sessionStore;
+if (normalizedUriForSession) {
+  try {
+    validateMongoUri(normalizedUriForSession);
+    sessionStore = MongoStore.create({
+      mongoUrl: normalizedUriForSession,
+      ttl: 60 * 60 * 8,
+      autoRemove: 'native',
+    });
+  } catch (err) {
+    console.error('Session store setup error:', err.message || err);
+  }
+}
+
+app.set('trust proxy', 1);
+app.use(session({
+  name: 'inventory.sid',
+  secret: SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  ...(sessionStore ? { store: sessionStore } : {}),
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProduction,
+    maxAge: 1000 * 60 * 60 * 8,
+  },
+}));
 app.use('/uploads', express.static(UPLOADS_DIR));
 app.use(express.static(PUBLIC_DIR));
 
@@ -193,29 +240,8 @@ async function ensureStorage() {
 }
 
 async function connectDB() {
-  let mongoUri = String(MONGO_URI || '').trim();
-
-  if ((mongoUri.startsWith('"') && mongoUri.endsWith('"')) || (mongoUri.startsWith("'") && mongoUri.endsWith("'"))) {
-    mongoUri = mongoUri.slice(1, -1).trim();
-  }
-
-  if (/^MONGO_URI\s*=\s*/i.test(mongoUri)) {
-    mongoUri = mongoUri.replace(/^MONGO_URI\s*=\s*/i, '').trim();
-  }
-
-  if (!mongoUri) {
-    throw new Error('MONGO_URI is missing. Add it in your .env file.');
-  }
-
-  if (mongoUri.includes('<db_password>')) {
-    throw new Error(
-      'MONGO_URI still contains <db_password>. Replace it with your actual Atlas DB user password in .env.'
-    );
-  }
-
-  if (!mongoUri.startsWith('mongodb://') && !mongoUri.startsWith('mongodb+srv://')) {
-    throw new Error('Invalid MONGO_URI format. It must start with "mongodb://" or "mongodb+srv://".');
-  }
+  const mongoUri = normalizeMongoUri(MONGO_URI);
+  validateMongoUri(mongoUri);
 
   try {
     await mongoose.connect(mongoUri, {
