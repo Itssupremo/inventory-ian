@@ -206,6 +206,8 @@ async function connectDB() {
   try {
     await mongoose.connect(MONGO_URI, {
       dbName: 'inventory_system',
+      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 5,
     });
   } catch (err) {
     if (err?.code === 8000) {
@@ -219,23 +221,21 @@ async function connectDB() {
 
 async function seedDefaultUsers() {
   for (const user of DEFAULT_USERS) {
+    const exists = await User.findOne({ username: user.username }).select('_id').lean();
+    if (exists) continue;
+
     const passwordHash = await bcrypt.hash(user.password, 10);
-    await User.updateOne(
-      { username: user.username },
-      {
-        $set: {
-          passwordHash,
-          displayName: user.displayName,
-          role: user.role,
-          accessLevel: user.accessLevel,
-          responsibilities: user.responsibilities,
-          guidelines: user.guidelines,
-          canModifyInventory: user.canModifyInventory,
-          isActive: true,
-        },
-      },
-      { upsert: true }
-    );
+    await User.create({
+      username: user.username,
+      passwordHash,
+      displayName: user.displayName,
+      role: user.role,
+      accessLevel: user.accessLevel,
+      responsibilities: user.responsibilities,
+      guidelines: user.guidelines,
+      canModifyInventory: user.canModifyInventory,
+      isActive: true,
+    });
   }
 
   // Do NOT delete non-default users — they may have been created via the admin panel.
