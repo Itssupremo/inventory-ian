@@ -111,20 +111,11 @@ const ROLE_PROFILES = {
   },
 };
 
-const DEFAULT_USERS = [
-  {
-    username: 'admin',
-    password: 'admin123',
-    displayName: 'System Administrator',
-    ...ROLE_PROFILES.Administrator,
-  },
-  {
-    username: 'ian',
-    password: 'ian123',
-    displayName: 'Standard User',
-    ...ROLE_PROFILES.User,
-  },
-];
+const INITIAL_ADMIN = {
+  username: String(process.env.INIT_ADMIN_USERNAME || '').trim().toLowerCase(),
+  password: String(process.env.INIT_ADMIN_PASSWORD || '').trim(),
+  displayName: String(process.env.INIT_ADMIN_DISPLAY_NAME || 'System Administrator').trim(),
+};
 
 const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -214,7 +205,7 @@ app.use(express.static(PUBLIC_DIR));
 let initError = null;
 const initPromise = ensureStorage()
   .then(connectDB)
-  .then(seedDefaultUsers)
+  .then(seedInitialAdmin)
   .catch((err) => {
     initError = err;
     console.error('Initialization error:', err);
@@ -259,26 +250,37 @@ async function connectDB() {
   }
 }
 
-async function seedDefaultUsers() {
-  for (const user of DEFAULT_USERS) {
-    const exists = await User.findOne({ username: user.username }).select('_id').lean();
-    if (exists) continue;
+async function seedInitialAdmin() {
+  const hasUsers = await User.exists({});
+  if (hasUsers) return;
 
-    const passwordHash = await bcrypt.hash(user.password, 10);
-    await User.create({
-      username: user.username,
-      passwordHash,
-      displayName: user.displayName,
-      role: user.role,
-      accessLevel: user.accessLevel,
-      responsibilities: user.responsibilities,
-      guidelines: user.guidelines,
-      canModifyInventory: user.canModifyInventory,
-      isActive: true,
-    });
+  if (!INITIAL_ADMIN.username || !INITIAL_ADMIN.password) {
+    console.warn(
+      'No users found. Set INIT_ADMIN_USERNAME and INIT_ADMIN_PASSWORD to bootstrap the first administrator account.'
+    );
+    return;
   }
 
-  // Do NOT delete non-default users — they may have been created via the admin panel.
+  if (INITIAL_ADMIN.password.length < 8) {
+    throw new Error('INIT_ADMIN_PASSWORD must be at least 8 characters long.');
+  }
+
+  const passwordHash = await bcrypt.hash(INIT_ADMIN.password, 10);
+  const profile = ROLE_PROFILES.Administrator;
+
+  await User.create({
+    username: INITIAL_ADMIN.username,
+    passwordHash,
+    displayName: INITIAL_ADMIN.displayName || 'System Administrator',
+    role: profile.role,
+    accessLevel: profile.accessLevel,
+    responsibilities: profile.responsibilities,
+    guidelines: profile.guidelines,
+    canModifyInventory: profile.canModifyInventory,
+    isActive: true,
+  });
+
+  console.info(`Bootstrapped initial administrator account: ${INITIAL_ADMIN.username}`);
 }
 
 function toSafeUser(user) {
@@ -651,6 +653,9 @@ app.put('/api/settings/modules', requireRole(['Administrator']), async (req, res
     if (req.body[key] !== undefined) {
       s.modules[key] = Boolean(req.body[key]);
     }
+  }
+  if (req.body.inventoryViewMode !== undefined && ['list', 'grid'].includes(req.body.inventoryViewMode)) {
+    s.modules.inventoryViewMode = req.body.inventoryViewMode;
   }
   s.markModified('modules');
   await s.save();

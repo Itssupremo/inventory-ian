@@ -12,7 +12,9 @@ const settingsSchema = new mongoose.Schema({
     assignedTo:      { type: Boolean, default: true },
     location:        { type: Boolean, default: true },
     maintenanceDate: { type: Boolean, default: true },
+    inventoryViewMode: { type: String, default: 'list', enum: ['list', 'grid'] },
   },
 }, { timestamps: true });
+
 
 module.exports = mongoose.model('Settings', settingsSchema);

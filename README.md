@@ -53,6 +53,9 @@ Create a `.env` file (or edit the existing one) with:
 MONGO_URI=mongodb+srv://kyianmangubat7_db_user:<db_password>@cluster0.lb4ymvj.mongodb.net/inventory_system?retryWrites=true&w=majority&appName=Cluster0
 PORT=5000
 SESSION_SECRET=change_this_to_a_long_random_string
+INIT_ADMIN_USERNAME=your_admin_username
+INIT_ADMIN_PASSWORD=use_a_strong_password_here
+INIT_ADMIN_DISPLAY_NAME=System Administrator
 ```
 
 3. Replace `<db_password>` with your actual Atlas database user password.
@@ -67,16 +70,14 @@ npm run dev
 
 - http://localhost:5000
 
-## Login Accounts
+## Initial Setup
 
-- Administrator
-  - Username: `admin`
-  - Password: `admin123`
-  - Page: `/admin.html`
-- Standard User
-  - Username: `ian`
-  - Password: `ian123`
-  - Page: `/user.html`
+- On a fresh database, the app can bootstrap a single administrator account from:
+  - `INIT_ADMIN_USERNAME`
+  - `INIT_ADMIN_PASSWORD`
+  - `INIT_ADMIN_DISPLAY_NAME` (optional)
+- After the first administrator account is created, add other users from the admin panel.
+- Remove or clear the `INIT_ADMIN_*` variables after first setup if you do not want them retained in your environment.
 
 The root URL (`/`) redirects users based on session state:
 
@@ -92,14 +93,14 @@ The root URL (`/`) redirects users based on session state:
   - Laptop, Monitor, Tablet -> `HW-###`
   - Furniture -> `CH-###`
 
-## Default Users and Roles
+## User Roles
 
-The system auto-creates these users at startup:
+The system supports these built-in roles:
 
-| Username | Display Name | Role | Access Level |
-| --- | --- | --- | --- |
-| `admin` | System Administrator | Administrator | Full System Access |
-| `ian` | Standard User | User | Limited Access |
+| Role | Access Level |
+| --- | --- |
+| `Administrator` | Full System Access |
+| `User` | Limited Access |
 
 Role metadata endpoints:
 

@@ -91,6 +91,14 @@
                 </div>
                 <div id="userMaintenanceAlertList" class="maint-alert-list"></div>
               </section>
+              <div class="view-mode-toggle" id="userViewToggle">
+                <button class="view-btn view-btn-list active" data-view="list">
+                  <i class="bi bi-list-ul"></i> List
+                </button>
+                <button class="view-btn view-btn-grid" data-view="grid">
+                  <i class="bi bi-grid-3x2"></i> Grid
+                </button>
+              </div>
               <div class="filters">
                 <select id="userCategoryFilter"><option value="">All Categories</option></select>
                 <select id="userStatusFilter"><option value="">All Statuses</option></select>
@@ -113,6 +121,7 @@
                   <tbody id="userDashTableBody"></tbody>
                 </table>
               </div>
+              <div class="asset-grid" id="userDashGrid"></div>
               <div class="card-caption"><span id="userAssetCount">0 Items</span></div>
             </section>
           </div>
@@ -179,6 +188,14 @@
                 <h3><i class="bi bi-list-ul"></i> Inventory Items</h3>
                 <button id="resetFormBtn" class="btn btn-header" type="button">+ New Item</button>
               </div>
+              <div class="view-mode-toggle" id="itemViewToggle">
+                <button class="view-btn view-btn-list active" data-view="list">
+                  <i class="bi bi-list-ul"></i> List
+                </button>
+                <button class="view-btn view-btn-grid" data-view="grid">
+                  <i class="bi bi-grid-3x2"></i> Grid
+                </button>
+              </div>
               <div class="filters">
                 <select id="itemCategoryFilter"><option value="">All Categories</option></select>
                 <select id="itemStatusFilter"><option value="">All Statuses</option></select>
@@ -202,6 +219,7 @@
                   <tbody id="assetTableBody"></tbody>
                 </table>
               </div>
+              <div class="asset-grid" id="itemGrid"></div>
               <div class="card-caption"><span id="assetCount">0 Assets</span></div>
             </section>
 

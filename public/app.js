@@ -27,6 +27,7 @@ const state = {
   dashFilter: { search: '', category: '', status: '' },
   itemFilter: { search: '', category: '', status: '' },
   modules: { image: true, assetId: true, itemName: true, category: true, serialTag: true, status: true, assignedTo: true, location: true, maintenanceDate: true },
+  viewMode: 'list',
 };
 
 /* ── API helper ── */
@@ -68,7 +69,10 @@ function showSection(name) {
 async function loadSettings() {
   try {
     const data = await request('/api/settings');
-    if (data.modules) Object.assign(state.modules, data.modules);
+    if (data.modules) {
+      Object.assign(state.modules, data.modules);
+      if (data.modules.inventoryViewMode) state.viewMode = data.modules.inventoryViewMode;
+    }
   } catch (_) { /* use defaults */ }
 }
 
@@ -293,10 +297,24 @@ function makeAssetRow(asset, idx, withCrud) {
 function renderDashboard() {
   renderStats();
   renderMaintenanceWidget(state.assets, 'maintenanceAlertList', 'maintenanceAlertSection', 'maintenanceAlertBadge');
+
+  if (state.viewMode === 'grid') {
+    renderDashboardAsGrid();
+  } else {
+    renderDashboardAsTable();
+  }
+}
+
+function renderDashboardAsTable() {
   const filtered = applyFilter(state.dashFilter);
   const tbody    = document.getElementById('dashTableBody');
+  const table    = document.querySelector('.table-wrap');
+  const grid     = document.getElementById('dashboardGrid');
   const countEl  = document.getElementById('dashAssetCount');
   if (!tbody) return;
+
+  if (table) table.classList.remove('hidden');
+  if (grid) grid.classList.remove('visible');
 
   tbody.innerHTML = '';
   if (!filtered.length) {
@@ -325,12 +343,61 @@ function renderDashboard() {
   });
 }
 
+function renderDashboardAsGrid() {
+  const filtered = applyFilter(state.dashFilter);
+  const grid     = document.getElementById('dashboardGrid');
+  const table    = document.querySelector('.table-wrap');
+  const countEl  = document.getElementById('dashAssetCount');
+  if (!grid) return;
+
+  if (table) table.classList.add('hidden');
+  grid.classList.add('visible');
+  grid.innerHTML = '';
+
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="empty-row" style="grid-column: 1 / -1; text-align: center; padding: 40px;">No assets found.</div>';
+    if (countEl) countEl.textContent = '0 Assets';
+    return;
+  }
+
+  filtered.forEach((asset) => {
+    const card = createAssetCard(asset, false);
+    grid.appendChild(card);
+  });
+  if (countEl) countEl.textContent = filtered.length + ' Asset' + (filtered.length !== 1 ? 's' : '');
+
+  applyModuleVisibility();
+
+  grid.querySelectorAll('.dash-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const asset = state.assets.find(a => a.internalId === btn.dataset.id);
+      if (asset) { fillForm(asset); showSection('add-item'); }
+    });
+  });
+  grid.querySelectorAll('.dash-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => deleteAsset(btn.dataset.id, 'dashboard'));
+  });
+}
+
 /* ── add-item table ── */
 function renderItemTable() {
+  if (state.viewMode === 'grid') {
+    renderItemTableAsGrid();
+  } else {
+    renderItemTableAsTable();
+  }
+}
+
+function renderItemTableAsTable() {
   const filtered = applyFilter(state.itemFilter);
   const tbody    = document.getElementById('assetTableBody');
+  const table    = document.querySelector('#section-add-item .table-wrap');
+  const grid     = document.getElementById('itemGrid');
   const countEl  = document.getElementById('assetCount');
   if (!tbody) return;
+
+  if (table) table.classList.remove('hidden');
+  if (grid) grid.classList.remove('visible');
 
   tbody.innerHTML = '';
   if (!filtered.length) {
@@ -357,6 +424,108 @@ function renderItemTable() {
   tbody.querySelectorAll('.item-delete-btn').forEach(btn => {
     btn.addEventListener('click', () => deleteAsset(btn.dataset.id, 'add-item'));
   });
+}
+
+function renderItemTableAsGrid() {
+  const filtered = applyFilter(state.itemFilter);
+  const grid     = document.getElementById('itemGrid');
+  const table    = document.querySelector('#section-add-item .table-wrap');
+  const countEl  = document.getElementById('assetCount');
+  if (!grid) return;
+
+  if (table) table.classList.add('hidden');
+  grid.classList.add('visible');
+  grid.innerHTML = '';
+
+  if (!filtered.length) {
+    grid.innerHTML = '<div class="empty-row" style="grid-column: 1 / -1; text-align: center; padding: 40px;">No assets found.</div>';
+    if (countEl) countEl.textContent = '0 Assets';
+    return;
+  }
+
+  filtered.forEach((asset) => {
+    const card = createAssetCard(asset, true);
+    grid.appendChild(card);
+  });
+  if (countEl) countEl.textContent = filtered.length + ' Asset' + (filtered.length !== 1 ? 's' : '');
+
+  applyModuleVisibility();
+
+  grid.querySelectorAll('.item-edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const asset = state.assets.find(a => a.internalId === btn.dataset.id);
+      if (asset) { fillForm(asset); setMessage('Editing asset ' + asset.assetId + '. Make changes and click Update.', ''); }
+    });
+  });
+  grid.querySelectorAll('.item-delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => deleteAsset(btn.dataset.id, 'add-item'));
+  });
+}
+
+/* ── create asset card for grid view ── */
+function createAssetCard(asset, withCrud) {
+  const status = asset.status || '-';
+  const statusClass = 'status-' + status.replace(/\s+/g, '');
+
+  const imgHtml = asset.imageUrl
+    ? `<img src="${asset.imageUrl}" alt="${escHtml(asset.itemName)}" />`
+    : '<div class="img-placeholder"></div>';
+
+  const buttonClass = withCrud ? 'item-edit-btn' : 'dash-edit-btn';
+  const deleteClass = withCrud ? 'item-delete-btn' : 'dash-delete-btn';
+
+  const card = document.createElement('div');
+  card.className = 'asset-card';
+  card.innerHTML = `
+    <div class="asset-card-header">${imgHtml}</div>
+    <div class="asset-card-body">
+      <div class="asset-card-title">${escHtml(asset.itemName)}</div>
+      <div class="asset-card-meta" data-col="assetId" style="display: none;">
+        <span class="asset-card-meta-badge">${escHtml(asset.assetId)}</span>
+      </div>
+      <div class="asset-card-meta">
+        <span class="asset-card-meta-badge" data-col="category">${escHtml(asset.category)}</span>
+        <span class="asset-card-meta-badge" data-col="serialTag">${escHtml(asset.serialTagNumber)}</span>
+      </div>
+      <div class="asset-card-status" data-col="status">
+        <span class="status-pill ${statusClass}">${escHtml(status)}</span>
+      </div>
+      <div class="asset-card-assigned" data-col="assignedTo">${escHtml(asset.assignedTo)}</div>
+      <div class="asset-card-location" data-col="location">${escHtml(asset.location)}</div>
+      <div class="asset-card-maintenance" data-col="maintenanceDate" style="font-size: 0.85rem; color: #6b7394; margin-top: 2px;">${asset.maintenanceDate || '-'}</div>
+    </div>
+    <div class="asset-card-footer">
+      <button class="${buttonClass} btn btn-small btn-primary" data-id="${asset.internalId}">Edit</button>
+      ${withCrud ? `<button class="${deleteClass} btn btn-small btn-danger" data-id="${asset.internalId}">Delete</button>` : ''}
+    </div>
+  `;
+  return card;
+}
+
+/* ── update view mode ── */
+async function updateViewMode(newMode) {
+  state.viewMode = newMode;
+
+  // Update toggle buttons
+  document.querySelectorAll('.view-mode-toggle .view-btn').forEach(btn => {
+    btn.classList.remove('active');
+    if (btn.dataset.view === newMode) btn.classList.add('active');
+  });
+
+  // Re-render current section
+  if (state.currentSection === 'dashboard') renderDashboard();
+  if (state.currentSection === 'add-item') renderItemTable();
+
+  // Persist to backend
+  try {
+    await request('/api/settings/modules', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inventoryViewMode: newMode }),
+    });
+  } catch (err) {
+    console.warn('Failed to save view mode:', err);
+  }
 }
 
 /* ── delete shared ── */
@@ -690,6 +859,11 @@ function attachEvents() {
   document.getElementById('itemCategoryFilter')?.addEventListener('change', e => { state.itemFilter.category = e.target.value; renderItemTable(); });
   document.getElementById('itemStatusFilter')?.addEventListener('change',   e => { state.itemFilter.status   = e.target.value; renderItemTable(); });
   document.getElementById('itemSearch')?.addEventListener('input',          e => { state.itemFilter.search   = e.target.value; renderItemTable(); });
+
+  /* view mode toggles */
+  document.querySelectorAll('.view-mode-toggle .view-btn').forEach(btn => {
+    btn.addEventListener('click', () => updateViewMode(btn.dataset.view));
+  });
 
   /* edit user modal */
   document.getElementById('editUserForm')?.addEventListener('submit', async (e) => {
